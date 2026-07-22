@@ -53,15 +53,19 @@ def process():
     try:
         results = run_pipeline(source, language)
         
-        # Store RAG chain in memory linked to user session
         session_id = str(uuid.uuid4())
         rag_chains[session_id] = results.pop("rag_chain")
         session["session_id"] = session_id
 
         return jsonify({"success": True, "data": results})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
+    # Catch language mismatch or empty audio validation errors
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+
+    # Catch any unexpected system errors
+    except Exception as e:
+        return jsonify({"error": f"Processing failed: {str(e)}"}), 500
 @app.route("/api/chat", methods=["POST"])
 def chat():
     session_id = session.get("session_id")

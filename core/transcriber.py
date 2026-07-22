@@ -105,20 +105,40 @@ def transcribe_chunk(chunk_path: str, language: str = "english") -> str:
 
 
 def transcribe_all(chunks: list, language: str = "english") -> str:
-
     full_transcript = "" 
 
     engine = "Sarvam AI" if language.lower() == "hinglish" else "Whisper"
     print(f"Using {engine} for transcription.")
 
     for i, chunk in enumerate(chunks):  
-
         print(f"Transcribing chunk {i + 1}/{len(chunks)}...")
-
         text = transcribe_chunk(chunk, language=language)  
+        if text:
+            full_transcript += text.strip() + " "  
 
-        full_transcript += text + " "  
-
+    final_text = full_transcript.strip()
     print("Transcription complete.")
 
-    return full_transcript.strip()  
+    # ----------------------------------------------------
+    # VALIDATION CHECK 1: No Speech Detected
+    # ----------------------------------------------------
+    if not final_text:
+        raise ValueError(
+            "No audible speech detected in the audio file. "
+            "Please check if the video has clear spoken audio."
+        )
+
+    # ----------------------------------------------------
+    # VALIDATION CHECK 2: Language Mismatch Heuristic
+    # ----------------------------------------------------
+    # Checks if Devanagari script (Hindi/Marathi/etc.) is present in the output
+    has_devanagari = any('\u0900' <= char <= '\u097F' for char in final_text)
+
+    if language.lower() == "english" and has_devanagari:
+        raise ValueError(
+            "Language mismatch detected! The video contains Hindi speech, but 'English' was selected. "
+            "Please switch the language option to 'Hinglish' and try again."
+        )
+
+    return final_text
+
