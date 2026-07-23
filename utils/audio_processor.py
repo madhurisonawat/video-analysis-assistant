@@ -4,12 +4,18 @@ import os
 
 DOWNLOAD_DIR = 'downloads'
 os.makedirs(DOWNLOAD_DIR,exist_ok = True)
+def download_youtube_audio(url: str) -> str:
+    output_tmpl = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
 
-def download_youtube_audio(url :str) ->str:
-    output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
     ydl_opts = {
         "format": "bestaudio/best",
-        "outtmpl": output_path,
+        "outtmpl": output_tmpl,
+        # Force yt-dlp to pretend it's an iOS app to avoid standard web blocks
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["ios", "mweb"]
+            }
+        },
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -17,14 +23,21 @@ def download_youtube_audio(url :str) ->str:
                 "preferredquality": "192",
             }
         ],
+        "ffmpeg_location": ffmpeg_exe_path,
         "quiet": True,
     }
+
+    # If cookies.txt exists in root directory, tell yt-dlp to use it
+    cookie_path = os.path.join(os.getcwd(), "cookies.txt")
+    if os.path.exists(cookie_path):
+        ydl_opts["cookiefile"] = cookie_path
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info).replace(".webm", ".wav").replace(".m4a", ".wav")
-    return filename
+        filename = ydl.prepare_filename(info)
+        wav_path = os.path.splitext(filename)[0] + ".wav"
 
-
+    return wav_path
 
 def convert_to_wav(input_path: str) -> str:
     """Convert any audio/video file to WAV format using pydub."""
