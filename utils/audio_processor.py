@@ -16,13 +16,17 @@ def download_youtube_audio(url: str) -> str:
     output_tmpl = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
     cookie_path = None
 
-    # Decode Base64 Netscape cookies from Railway Environment Variable
+    # Handle Base64 decoded cookie string
     yt_cookie_env = os.getenv("YOUTUBE_COOKIE")
     if yt_cookie_env:
         cookie_path = os.path.join(DOWNLOAD_DIR, "railway_yt_cookies.txt")
         try:
-            # Decode Base64 string back into original Netscape tabbed file format
-            decoded_bytes = base64.b64decode(yt_cookie_env.strip())
+            clean_b64 = yt_cookie_env.strip().replace("\n", "").replace("\r", "")
+            missing_padding = len(clean_b64) % 4
+            if missing_padding:
+                clean_b64 += "=" * (4 - missing_padding)
+
+            decoded_bytes = base64.b64decode(clean_b64)
             with open(cookie_path, "wb") as f:
                 f.write(decoded_bytes)
         except Exception as e:
@@ -32,6 +36,8 @@ def download_youtube_audio(url: str) -> str:
     ydl_opts = {
         "format": "bestaudio/best/ba/b",
         "outtmpl": output_tmpl,
+        # Allow yt-dlp to use node or deno JS runtimes to solve YouTube's n-challenge
+        "js_runtimes": ["node", "deno"],
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -45,13 +51,9 @@ def download_youtube_audio(url: str) -> str:
     if ffmpeg_exe_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_exe_path
 
-    # Attach decoded cookie file
     if cookie_path and os.path.exists(cookie_path):
         ydl_opts["cookiefile"] = cookie_path
-    elif os.path.exists("cookies.txt"):
-        ydl_opts["cookiefile"] = "cookies.txt"
-    print("Cookie exists:", cookie_path)
-    print("Cookie file exists:", os.path.exists(cookie_path) if cookie_path else False)
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
