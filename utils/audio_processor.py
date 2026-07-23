@@ -1,8 +1,9 @@
-import yt_dlp
-from pydub import AudioSegment
-import re
-import os
+import base64  # <--- ADDED MISSING IMPORT
 import imageio_ffmpeg
+import os
+import re
+from pydub import AudioSegment
+
 import yt_dlp
 from youtube_transcript_api import YouTubeTranscriptApi
 
@@ -24,9 +25,12 @@ def extract_video_id(url: str) -> str:
 def fetch_youtube_transcript_text(video_id: str) -> str:
     """Fetch text transcript directly without downloading audio files."""
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(
+        # Updated to handle newer versions of youtube-transcript-api
+        api = YouTubeTranscriptApi()
+        fetched_transcript = api.fetch(
             video_id, languages=["en", "hi", "en-IN"]
         )
+        transcript_list = fetched_transcript.to_raw_data()
         return " ".join([item["text"] for item in transcript_list])
     except Exception as e:
         print(f"Transcript fetch error: {e}")
@@ -41,7 +45,9 @@ def download_youtube_audio(url: str) -> str:
     if yt_cookie_env:
         cookie_path = os.path.join(DOWNLOAD_DIR, "railway_yt_cookies.txt")
         try:
-            clean_b64 = yt_cookie_env.strip().replace("\n", "").replace("\r", "")
+            clean_b64 = (
+                yt_cookie_env.strip().replace("\n", "").replace("\r", "")
+            )
             missing_padding = len(clean_b64) % 4
             if missing_padding:
                 clean_b64 += "=" * (4 - missing_padding)
@@ -79,40 +85,41 @@ def download_youtube_audio(url: str) -> str:
             wav_path = os.path.splitext(filename)[0] + ".wav"
             return wav_path
     except Exception as e:
-        print(f"Audio download blocked by YouTube ({e}). Attempting transcript API fallback...")
+        print(
+            f"Audio download blocked by YouTube ({e}). Attempting transcript API fallback..."
+        )
         video_id = extract_video_id(url)
         transcript_text = fetch_youtube_transcript_text(video_id)
         if transcript_text:
-            # Return raw text string flag or save to temporary text file
             txt_path = os.path.join(DOWNLOAD_DIR, f"{video_id}_transcript.txt")
             with open(txt_path, "w", encoding="utf-8") as f:
                 f.write(transcript_text)
             return txt_path
         raise e
+
+
 def convert_to_wav(input_path: str) -> str:
     """Convert any audio/video file to WAV format using pydub."""
     output_path = os.path.splitext(input_path)[0] + "_converted.wav"
     audio = AudioSegment.from_file(input_path)
-    audio = audio.set_channels(1).set_frame_rate(16000) #16khz
+    audio = audio.set_channels(1).set_frame_rate(16000)
     audio.export(output_path, format="wav")
     return output_path
 
 
-
-def chunk_audio(wav_path : str , chunk_minutes : int = 10) -> list:
+def chunk_audio(wav_path: str, chunk_minutes: int = 10) -> list:
     audio = AudioSegment.from_wav(wav_path)
-    chunk_ms = chunk_minutes * 60 * 1000 
+    chunk_ms = chunk_minutes * 60 * 1000
 
     chunks = []
-
-    for i, start in enumerate(range(0,len(audio),chunk_ms)):
+    for i, start in enumerate(range(0, len(audio), chunk_ms)):
         chunk = audio[start : start + chunk_ms]
         chunk_path = f"{wav_path}_chunk_{i}.wav"
-        chunk.export(chunk_path , format = "wav")
-
+        chunk.export(chunk_path, format="wav")
         chunks.append(chunk_path)
-    
+
     return chunks
+
 
 def process_input(source: str) -> list:
     if source.startswith("http://") or source.startswith("https://"):
