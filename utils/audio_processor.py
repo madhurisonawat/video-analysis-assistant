@@ -1,22 +1,42 @@
 import yt_dlp
 from pydub import AudioSegment
+import re
 import os
 import imageio_ffmpeg
-import base64
+import yt_dlp
+from youtube_transcript_api import YouTubeTranscriptApi
 
-DOWNLOAD_DIR = 'downloads'
-os.makedirs(DOWNLOAD_DIR,exist_ok = True)
+DOWNLOAD_DIR = "downloads"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
 try:
     ffmpeg_exe_path = imageio_ffmpeg.get_ffmpeg_exe()
 except Exception:
     ffmpeg_exe_path = None
 
 
+def extract_video_id(url: str) -> str:
+    """Extract 11-character YouTube video ID."""
+    match = re.search(r"(?:v=|\/|youtu\.be\/)([0-9A-Za-z_-]{11})", url)
+    return match.group(1) if match else url
+
+
+def fetch_youtube_transcript_text(video_id: str) -> str:
+    """Fetch text transcript directly without downloading audio files."""
+    try:
+        transcript_list = YouTubeTranscriptApi.get_transcript(
+            video_id, languages=["en", "hi", "en-IN"]
+        )
+        return " ".join([item["text"] for item in transcript_list])
+    except Exception as e:
+        print(f"Transcript fetch error: {e}")
+        return None
+
+
 def download_youtube_audio(url: str) -> str:
     output_tmpl = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
     cookie_path = None
 
-    # Handle Base64 decoded cookie string
     yt_cookie_env = os.getenv("YOUTUBE_COOKIE")
     if yt_cookie_env:
         cookie_path = os.path.join(DOWNLOAD_DIR, "railway_yt_cookies.txt")
@@ -36,12 +56,6 @@ def download_youtube_audio(url: str) -> str:
     ydl_opts = {
         "format": "bestaudio/best/ba/b",
         "outtmpl": output_tmpl,
-        # Allow yt-dlp to use node or deno JS runtimes to solve YouTube's n-challenge
-        # Dict format required by yt-dlp
-        "js_runtimes": {
-            "node": {},
-            "deno": {},
-        },
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -58,13 +72,23 @@ def download_youtube_audio(url: str) -> str:
     if cookie_path and os.path.exists(cookie_path):
         ydl_opts["cookiefile"] = cookie_path
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info)
-        wav_path = os.path.splitext(filename)[0] + ".wav"
-
-    return wav_path
-
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+            wav_path = os.path.splitext(filename)[0] + ".wav"
+            return wav_path
+    except Exception as e:
+        print(f"Audio download blocked by YouTube ({e}). Attempting transcript API fallback...")
+        video_id = extract_video_id(url)
+        transcript_text = fetch_youtube_transcript_text(video_id)
+        if transcript_text:
+            # Return raw text string flag or save to temporary text file
+            txt_path = os.path.join(DOWNLOAD_DIR, f"{video_id}_transcript.txt")
+            with open(txt_path, "w", encoding="utf-8") as f:
+                f.write(transcript_text)
+            return txt_path
+        raise e
 def convert_to_wav(input_path: str) -> str:
     """Convert any audio/video file to WAV format using pydub."""
     output_path = os.path.splitext(input_path)[0] + "_converted.wav"
