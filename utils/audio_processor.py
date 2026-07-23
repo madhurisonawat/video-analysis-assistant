@@ -37,7 +37,11 @@ def download_youtube_audio(url: str) -> str:
         "format": "bestaudio/best/ba/b",
         "outtmpl": output_tmpl,
         # Allow yt-dlp to use node or deno JS runtimes to solve YouTube's n-challenge
-        "js_runtimes": ["node", "deno"],
+        # Dict format required by yt-dlp
+        "js_runtimes": {
+            "node": {},
+            "deno": {},
+        },
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
