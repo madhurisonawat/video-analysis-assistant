@@ -10,20 +10,21 @@ try:
 except Exception:
     ffmpeg_exe_path = None
 
-
 def download_youtube_audio(url: str) -> str:
     output_tmpl = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
 
+    # Write cookie from Railway environment variable if set
+    cookie_path = None
+    yt_cookie_env = os.getenv("YOUTUBE_COOKIE")
+    if yt_cookie_env:
+        cookie_path = os.path.join(DOWNLOAD_DIR, "railway_yt_cookies.txt")
+        # Format as netscape cookie header or pass raw
+        with open(cookie_path, "w") as f:
+            f.write(yt_cookie_env)
+
     ydl_opts = {
-        # Format fallback sequence to prevent format availability errors
         "format": "bestaudio/best/ba/b",
         "outtmpl": output_tmpl,
-        # Use tv_embedded & mweb to bypass YouTube's recent API changes
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["tv_embedded", "mweb", "android"],
-            }
-        },
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -37,12 +38,8 @@ def download_youtube_audio(url: str) -> str:
     if ffmpeg_exe_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_exe_path
 
-    # Automatically check for exported cookies file
-    for cookie_name in ["cookies.txt", "my_cookies.txt"]:
-        cookie_path = os.path.join(os.getcwd(), cookie_name)
-        if os.path.exists(cookie_path):
-            ydl_opts["cookiefile"] = cookie_path
-            break
+    if cookie_path and os.path.exists(cookie_path):
+        ydl_opts["cookiefile"] = cookie_path
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
