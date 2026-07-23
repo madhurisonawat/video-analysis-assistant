@@ -15,13 +15,13 @@ def download_youtube_audio(url: str) -> str:
     output_tmpl = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
 
     ydl_opts = {
-        # Fallback format string: try best audio, then any audio, then best overall video/audio stream
+        # Format fallback sequence to prevent format availability errors
         "format": "bestaudio/best/ba/b",
         "outtmpl": output_tmpl,
-        # Multi-client fallback strategy to prevent "Format not available" errors
+        # Use tv_embedded & mweb to bypass YouTube's recent API changes
         "extractor_args": {
             "youtube": {
-                "player_client": ["mweb", "ios", "android"],
+                "player_client": ["tv_embedded", "mweb", "android"],
             }
         },
         "postprocessors": [
@@ -34,11 +34,10 @@ def download_youtube_audio(url: str) -> str:
         "quiet": True,
     }
 
-    # Only pass explicit ffmpeg location if imageio_ffmpeg resolved it
     if ffmpeg_exe_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_exe_path
 
-    # Check for cookies file (my_cookies.txt or cookies.txt)
+    # Automatically check for exported cookies file
     for cookie_name in ["cookies.txt", "my_cookies.txt"]:
         cookie_path = os.path.join(os.getcwd(), cookie_name)
         if os.path.exists(cookie_path):

@@ -29,7 +29,7 @@
   <!-- Main Layout -->
   <main class="max-w-7xl mx-auto w-full px-6 py-8 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-    <!-- Left Column: Input Form & Insights Tabs (8 Cols) -->
+    <!-- Left Column: Input Form & Insights Tabs (7 Cols) -->
     <div class="lg:col-span-7 flex flex-col space-y-6">
       
       <!-- Input Card -->
@@ -71,6 +71,7 @@
             </div>
           </div>
         </form>
+
         <!-- Loader -->
         <div id="loader" class="hidden mt-6 text-center py-6 border-t border-slate-700/50">
           <i class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-3xl mb-3"></i>
@@ -78,11 +79,13 @@
           <p class="text-xs text-slate-500 mt-1">This may take a minute depending on duration.</p>
         </div>
       </div>
-  <!-- Error Banner -->
-<div id="error-banner" class="hidden mb-4 p-4 rounded-lg bg-red-900/40 border border-red-500/50 text-red-200 text-sm flex items-start gap-3">
-  <i class="fa-solid fa-triangle-exclamation text-red-400 text-lg mt-0.5"></i>
-  <div id="error-message"></div>
-</div>
+
+      <!-- Error Banner -->
+      <div id="error-banner" class="hidden mb-4 p-4 rounded-lg bg-red-900/40 border border-red-500/50 text-red-200 text-sm flex items-start gap-3">
+        <i class="fa-solid fa-triangle-exclamation text-red-400 text-lg mt-0.5"></i>
+        <div id="error-message"></div>
+      </div>
+
       <!-- Results Card (Tabs) -->
       <div id="results-container" class="hidden bg-slate-800/60 border border-slate-700/60 rounded-xl p-6 shadow-xl flex-1 flex flex-col">
         <div class="border-b border-slate-700 pb-3 mb-4">
@@ -122,7 +125,7 @@
 
       <!-- Messages Window -->
       <div id="chat-box" class="flex-1 p-4 space-y-4 overflow-y-auto text-sm">
-        <div class="bg-slate-700/40 border border-slate-700/60 p-3 rounded-lg text-slate-400 text-xs text-center">
+        <div id="chat-placeholder" class="bg-slate-700/40 border border-slate-700/60 p-3 rounded-lg text-slate-400 text-xs text-center">
           Process a video on the left to start asking interactive questions about the content.
         </div>
       </div>
@@ -151,63 +154,162 @@
   </main>
 
   <script>
-    document.getElementById('process-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  
-  const source = document.getElementById('source-input').value;
-  const language = document.getElementById('language-input').value;
+    // Tab switching logic
+    function switchTab(tabName) {
+      // Hide all panes
+      const panes = document.querySelectorAll('.tab-pane');
+      panes.forEach(pane => pane.classList.add('hidden'));
 
-  const loader = document.getElementById('loader');
-  const resultsContainer = document.getElementById('results-container');
-  const submitBtn = document.getElementById('submit-btn');
-  const errorBanner = document.getElementById('error-banner');
-  const errorMessage = document.getElementById('error-message');
+      // Deactivate all tab buttons
+      const buttons = document.querySelectorAll('.tab-btn');
+      buttons.forEach(btn => {
+        btn.classList.remove('border-indigo-500', 'text-indigo-400');
+        btn.classList.add('border-transparent', 'text-slate-400');
+      });
 
-  // Reset UI State
-  errorBanner.classList.add('hidden');
-  resultsContainer.classList.add('hidden');
-  loader.classList.remove('hidden');
-  submitBtn.disabled = true;
+      // Show selected pane
+      const targetPane = document.getElementById(`pane-${tabName}`);
+      if (targetPane) {
+        targetPane.classList.remove('hidden');
+      }
 
-  try {
-    const res = await fetch('/api/process', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source, language })
-    });
-    
-    const data = await res.json();
-
-    if (!res.ok || !data.success) {
-      // Throw the error message sent from Flask
-      throw new Error(data.error || 'Failed to process request.');
+      // Highlight selected button
+      const targetButton = document.getElementById(`tab-${tabName}`);
+      if (targetButton) {
+        targetButton.classList.remove('border-transparent', 'text-slate-400');
+        targetButton.classList.add('border-indigo-500', 'text-indigo-400');
+      }
     }
 
-    // Populate Results on Success
-    const result = data.data;
-    document.getElementById('res-title').innerText = result.title;
-    document.getElementById('pane-summary').innerText = result.summary;
-    document.getElementById('pane-actions').innerText = result.action_items;
-    document.getElementById('pane-decisions').innerText = result.key_decisions;
-    document.getElementById('pane-questions').innerText = result.open_questions;
-    document.getElementById('pane-transcript').innerText = result.transcript;
+    // Process Video Form Handler
+    document.getElementById('process-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const source = document.getElementById('source-input').value;
+      const language = document.getElementById('language-input').value;
 
-    resultsContainer.classList.remove('hidden');
+      const loader = document.getElementById('loader');
+      const resultsContainer = document.getElementById('results-container');
+      const submitBtn = document.getElementById('submit-btn');
+      const errorBanner = document.getElementById('error-banner');
+      const errorMessage = document.getElementById('error-message');
 
-    // Enable chat widget
-    document.getElementById('chat-input').disabled = false;
-    document.getElementById('chat-btn').disabled = false;
+      // Reset UI State
+      errorBanner.classList.add('hidden');
+      resultsContainer.classList.add('hidden');
+      loader.classList.remove('hidden');
+      submitBtn.disabled = true;
 
-  } catch (err) {
-    // Show error message banner
-    errorMessage.innerText = err.message;
-    errorBanner.classList.remove('hidden');
-  } finally {
-    // ALWAYS hide loader spinner, whether success or error
-    loader.classList.add('hidden');
-    submitBtn.disabled = false;
-  }
-});
+      try {
+        const res = await fetch('/api/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source, language })
+        });
+        
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Failed to process request.');
+        }
+
+        // Populate Results on Success
+        const result = data.data;
+        document.getElementById('res-title').innerText = result.title;
+        document.getElementById('pane-summary').innerText = result.summary;
+        document.getElementById('pane-actions').innerText = result.action_items;
+        document.getElementById('pane-decisions').innerText = result.key_decisions;
+        document.getElementById('pane-questions').innerText = result.open_questions;
+        document.getElementById('pane-transcript').innerText = result.transcript;
+
+        resultsContainer.classList.remove('hidden');
+        switchTab('summary'); // Reset tab view to summary
+
+        // Enable chat widget
+        document.getElementById('chat-input').disabled = false;
+        document.getElementById('chat-btn').disabled = false;
+        
+        // Remove placeholder text inside chat
+        const placeholder = document.getElementById('chat-placeholder');
+        if (placeholder) placeholder.remove();
+
+      } catch (err) {
+        errorMessage.innerText = err.message;
+        errorBanner.classList.remove('hidden');
+      } finally {
+        loader.classList.add('hidden');
+        submitBtn.disabled = false;
+      }
+    });
+
+    // Interactive Chat Handler
+    document.getElementById('chat-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const chatInput = document.getElementById('chat-input');
+      const chatBox = document.getElementById('chat-box');
+      const question = chatInput.value.trim();
+
+      if (!question) return;
+
+      // Render User Message
+      chatBox.innerHTML += `
+        <div class="flex justify-end">
+          <div class="bg-indigo-600 text-white rounded-lg px-3.5 py-2 max-w-[85%]">
+            ${question}
+          </div>
+        </div>
+      `;
+
+      chatInput.value = '';
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      // Render Typing Indicator
+      const loadingId = 'loading-' + Date.now();
+      chatBox.innerHTML += `
+        <div id="${loadingId}" class="flex justify-start">
+          <div class="bg-slate-700/60 text-slate-300 rounded-lg px-3.5 py-2 flex items-center gap-2">
+            <i class="fa-solid fa-circle-notch fa-spin text-xs"></i> Thinking...
+          </div>
+        </div>
+      `;
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question })
+        });
+
+        const data = await res.json();
+        document.getElementById(loadingId).remove();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Failed to get answer.');
+        }
+
+        // Render Assistant Response
+        chatBox.innerHTML += `
+          <div class="flex justify-start">
+            <div class="bg-slate-700/60 text-slate-200 border border-slate-700 rounded-lg px-3.5 py-2 max-w-[85%] whitespace-pre-wrap">
+              ${data.answer}
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        document.getElementById(loadingId).remove();
+        chatBox.innerHTML += `
+          <div class="flex justify-start">
+            <div class="bg-red-900/40 border border-red-500/50 text-red-200 rounded-lg px-3.5 py-2 max-w-[85%]">
+              ⚠️ ${err.message}
+            </div>
+          </div>
+        `;
+      }
+
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
   </script>
 </body>
 </html>
