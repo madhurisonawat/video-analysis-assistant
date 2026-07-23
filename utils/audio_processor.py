@@ -2,6 +2,7 @@ import yt_dlp
 from pydub import AudioSegment
 import os
 import imageio_ffmpeg
+import base64
 
 DOWNLOAD_DIR = 'downloads'
 os.makedirs(DOWNLOAD_DIR,exist_ok = True)
@@ -49,14 +50,15 @@ def download_youtube_audio(url: str) -> str:
         ydl_opts["cookiefile"] = cookie_path
     elif os.path.exists("cookies.txt"):
         ydl_opts["cookiefile"] = "cookies.txt"
-
+    print("Cookie exists:", cookie_path)
+    print("Cookie file exists:", os.path.exists(cookie_path) if cookie_path else False)
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
         wav_path = os.path.splitext(filename)[0] + ".wav"
 
     return wav_path
- 
+
 def convert_to_wav(input_path: str) -> str:
     """Convert any audio/video file to WAV format using pydub."""
     output_path = os.path.splitext(input_path)[0] + "_converted.wav"
