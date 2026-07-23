@@ -1,19 +1,27 @@
 import yt_dlp
 from pydub import AudioSegment
 import os
+import imageio_ffmpeg
 
 DOWNLOAD_DIR = 'downloads'
 os.makedirs(DOWNLOAD_DIR,exist_ok = True)
+try:
+    ffmpeg_exe_path = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:
+    ffmpeg_exe_path = None
+
+
 def download_youtube_audio(url: str) -> str:
     output_tmpl = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
 
     ydl_opts = {
-        "format": "bestaudio/best",
+        # Fallback format string: try best audio, then any audio, then best overall video/audio stream
+        "format": "bestaudio/best/ba/b",
         "outtmpl": output_tmpl,
-        # Force yt-dlp to pretend it's an iOS app to avoid standard web blocks
+        # Multi-client fallback strategy to prevent "Format not available" errors
         "extractor_args": {
             "youtube": {
-                "player_client": ["ios", "mweb"]
+                "player_client": ["mweb", "ios", "android"],
             }
         },
         "postprocessors": [
@@ -23,14 +31,19 @@ def download_youtube_audio(url: str) -> str:
                 "preferredquality": "192",
             }
         ],
-        "ffmpeg_location": ffmpeg_exe_path,
         "quiet": True,
     }
 
-    # If cookies.txt exists in root directory, tell yt-dlp to use it
-    cookie_path = os.path.join(os.getcwd(), "cookies.txt")
-    if os.path.exists(cookie_path):
-        ydl_opts["cookiefile"] = cookie_path
+    # Only pass explicit ffmpeg location if imageio_ffmpeg resolved it
+    if ffmpeg_exe_path:
+        ydl_opts["ffmpeg_location"] = ffmpeg_exe_path
+
+    # Check for cookies file (my_cookies.txt or cookies.txt)
+    for cookie_name in ["cookies.txt", "my_cookies.txt"]:
+        cookie_path = os.path.join(os.getcwd(), cookie_name)
+        if os.path.exists(cookie_path):
+            ydl_opts["cookiefile"] = cookie_path
+            break
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
