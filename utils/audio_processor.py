@@ -10,17 +10,23 @@ try:
 except Exception:
     ffmpeg_exe_path = None
 
+
 def download_youtube_audio(url: str) -> str:
     output_tmpl = os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s")
-
-    # Write cookie from Railway environment variable if set
     cookie_path = None
+
+    # Decode Base64 Netscape cookies from Railway Environment Variable
     yt_cookie_env = os.getenv("YOUTUBE_COOKIE")
     if yt_cookie_env:
         cookie_path = os.path.join(DOWNLOAD_DIR, "railway_yt_cookies.txt")
-        # Format as netscape cookie header or pass raw
-        with open(cookie_path, "w") as f:
-            f.write(yt_cookie_env)
+        try:
+            # Decode Base64 string back into original Netscape tabbed file format
+            decoded_bytes = base64.b64decode(yt_cookie_env.strip())
+            with open(cookie_path, "wb") as f:
+                f.write(decoded_bytes)
+        except Exception as e:
+            print(f"Error decoding YOUTUBE_COOKIE: {e}")
+            cookie_path = None
 
     ydl_opts = {
         "format": "bestaudio/best/ba/b",
@@ -38,8 +44,11 @@ def download_youtube_audio(url: str) -> str:
     if ffmpeg_exe_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_exe_path
 
+    # Attach decoded cookie file
     if cookie_path and os.path.exists(cookie_path):
         ydl_opts["cookiefile"] = cookie_path
+    elif os.path.exists("cookies.txt"):
+        ydl_opts["cookiefile"] = "cookies.txt"
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
