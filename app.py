@@ -16,7 +16,7 @@ load_dotenv()
 # 1. Page Configuration & Custom CSS Styling
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="AI Video & Meeting Assistant",
+    page_title="Video Analysis & Meeting Assistant",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded",
