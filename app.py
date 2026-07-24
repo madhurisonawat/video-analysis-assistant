@@ -284,7 +284,7 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 # 5. Main Screen Layout
 # -----------------------------------------------------------------------------
-st.markdown("<h1 class='gradient-header'>AI Video & Meeting Assistant</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='gradient-header'>Video Analysis & Meeting Assistant</h1>", unsafe_allow_html=True)
 st.caption("Generate action items, summaries, key decisions, and chat directly with your video content.")
 
 # Explanatory Language Tip Section
